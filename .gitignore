@@ -1,0 +1,34 @@
+# Gradle
+.gradle/
+build/
+
+# Local configuration
+/local.properties
+/.idea
+.DS_Store
+
+# Log files
+*.log
+
+# Android
+*.apk
+*.aab
+*.iml
+captures/
+output.json
+
+# Generated files
+app/build/
+*/build/
+
+# Kotlin/Java
+*.class
+*.jar
+*.war
+*.ear
+
+# Misc
+/.gradle
+/.idea
+*.hprof
+
