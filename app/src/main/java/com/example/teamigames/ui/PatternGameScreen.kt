@@ -344,7 +344,7 @@ fun SlotWithPattern(
             contentDescription = patternColor.label,
             modifier = Modifier
                 .size(120.dp)
-                .alpha(0.50f),
+                .alpha(0.35f),
             contentScale = ContentScale.Fit
         )
         // 🟢 Botón colocado con animación de caída
