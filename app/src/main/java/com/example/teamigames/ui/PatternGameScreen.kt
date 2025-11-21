@@ -1,6 +1,7 @@
 package com.example.teamigames.ui
 
 import android.annotation.SuppressLint
+import android.content.res.Configuration
 import android.speech.tts.TextToSpeech
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -14,167 +15,99 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.*
 import com.example.teamigames.R
 
-// ⭐ Ahora cada color usa la imagen real
-enum class GameColor(val label: String, val imageRes: Int) {
-    RED("Rojo", R.drawable.rojo),
-    BLUE("Azul", R.drawable.azul),
-    GREEN("Verde", R.drawable.verde),
-    LILAC("Rosa", R.drawable.rosa),
-    DARK_BLUE("Azul Rey", R.drawable.azul_rey),
-    ORANGE("Naranja", R.drawable.naranja)
+enum class GameColor(val imageRes: Int) {
+    RED(R.drawable.rojo),
+    BLUE(R.drawable.azul),
+    GREEN(R.drawable.verde),
+    LILAC(R.drawable.rosa),
+    DARK_BLUE(R.drawable.azul_rey),
+    ORANGE(R.drawable.naranja)
 }
 
 @SuppressLint("Range")
 @Composable
 fun PatternGameScreen() {
-
-    // ⭐ Inicialización del TTS
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val orientation = configuration.orientation
+
     var ttsEngine by remember { mutableStateOf<TextToSpeech?>(null) }
 
     DisposableEffect(Unit) {
-        var localEngine: TextToSpeech? = null
-        localEngine = TextToSpeech(context) { status ->
+        ttsEngine = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
-                localEngine?.language = Locale("es", "ES")
+                ttsEngine?.language = Locale("es", "ES")
             }
         }
-        ttsEngine = localEngine
-
         onDispose {
-            localEngine?.stop()
-            localEngine?.shutdown()
+            ttsEngine?.stop()
+            ttsEngine?.shutdown()
         }
     }
-
 
     fun speak(text: String, isSuccess: Boolean? = null) {
         val engine = ttsEngine ?: return
-
         when (isSuccess) {
-            true -> {
-                engine.setPitch(1.3f)
-                engine.setSpeechRate(1.1f)
-            }
-            false -> {
-                engine.setPitch(0.9f)
-                engine.setSpeechRate(0.9f)
-            }
-            else -> {
-                engine.setPitch(1.0f)
-                engine.setSpeechRate(1.0f)
-            }
+            true -> { engine.setPitch(1.3f); engine.setSpeechRate(1.1f) }
+            false -> { engine.setPitch(0.9f); engine.setSpeechRate(0.9f) }
+            else -> { engine.setPitch(1.0f); engine.setSpeechRate(1.0f) }
         }
-
         engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, "feedback")
     }
 
-    // Respuestas
     val successPhrases = listOf(
-        "¡Excelente trabajo!", "¡Muy bien!", "¡Lo estás logrando!",
-        "¡Qué gran acierto!", "¡Sigue así!", "¡Perfecto!",
-        "¡Eres un campeón!", "¡Vas muy bien!", "¡Impresionante!",
-        "¡Cada vez mejor!", "¡Qué bonito color elegiste!",
-        "¡Esa era la correcta!", "¡Buen ojo!", "¡Te salió genial!",
-        "¡Increíble!", "¡Esa fue muy buena!", "¡Tu memoria es excelente!",
-        "¡Lo hiciste con mucha precisión!", "¡Súper trabajo!",
-        "¡Me encanta cómo lo haces!"
+        "¡Excelente trabajo!", "¡Muy bien!", "¡Lo estás logrando!", "¡Qué gran acierto!",
+        "¡Sigue así!", "¡Perfecto!", "¡Eres un campeón!", "¡Vas muy bien!", "¡Impresionante!"
     )
-
     val failPhrases = listOf(
         "Casi, pero no ahí.", "Intenta otra vez.", "Ups, prueba en otro lugar.",
-        "No te preocupes, sigue intentando.", "Ahí no va.", "Casi lo logras.",
-        "Piensa bien, puedes hacerlo.", "No pasa nada, inténtalo de nuevo.",
-        "Esa no era, pero vas bien.", "Estás muy cerca.", "No te rindas.",
-        "Sigue probando.", "Esa no era, pero estás aprendiendo.",
-        "Vamos, tú puedes.", "Trata de recordar el patrón.",
-        "Tómate tu tiempo, no hay prisa.", "Respira y vuelve a intentarlo.",
-        "Esa no coincidía, busca otra.", "Recuerda los colores anteriores.",
-        "Confía en ti, puedes hacerlo."
+        "No te preocupes, sigue intentando.", "Ahí no va.", "Casi lo logras."
     )
 
-    // Estado del juego
     var correctCount by remember { mutableStateOf(0) }
     var failCount by remember { mutableStateOf(0) }
     var streakCount by remember { mutableStateOf(0) }
     var startTime by remember { mutableStateOf(System.currentTimeMillis()) }
     var elapsedTime by remember { mutableStateOf(0L) }
 
-    fun playSuccess(): String {
+    fun playSuccess() {
         correctCount++
         streakCount++
         elapsedTime = System.currentTimeMillis() - startTime
-
-        val phrase = when {
-            streakCount >= 5 -> listOf(
-                "¡Racha impresionante!", "¡Cinco aciertos seguidos!", "¡Estás en fuego!", "¡No paras de acertar!"
-            ).random()
-
-            correctCount >= 10 -> listOf(
-                "¡Eres increíble!", "¡Qué memoria tan buena!", "¡Ya casi completas todo!", "¡Brillante!"
-            ).random()
-
-            correctCount >= 5 -> listOf(
-                "¡Vas genial!", "¡Muy bien hecho!", "¡Esa fue muy buena!", "¡Sigue así!"
-            ).random()
-
-            else -> successPhrases.random()
-        }
-
-        speak(phrase, true)
-        return phrase
+        speak(successPhrases.random(), true)
     }
 
-    fun playFailure(): String {
+    fun playFailure() {
         failCount++
         streakCount = 0
-
-        val phrase = when {
-            failCount >= 10 -> listOf(
-                "Está bien equivocarse, lo estás intentando muy bien.",
-                "No te rindas, cada intento te acerca más.",
-                "Sigue con calma, lo lograrás."
-            ).random()
-
-            failCount >= 5 -> listOf(
-                "A veces cuesta, pero puedes hacerlo.",
-                "No pasa nada, inténtalo de nuevo.",
-                "Vamos, tú puedes lograrlo."
-            ).random()
-
-            else -> failPhrases.random()
-        }
-
-        speak(phrase, false)
-        return phrase
+        speak(failPhrases.random(), false)
     }
 
     fun generatePattern(): List<GameColor> = GameColor.values().toList().shuffled()
 
     var pattern by remember { mutableStateOf(generatePattern()) }
-    var placed by remember { mutableStateOf(List<GameColor?>(pattern.size) { null }) }
+    var placed by remember { mutableStateOf(List(pattern.size) { null as GameColor? }) }
     var selectedColor by remember { mutableStateOf<GameColor?>(null) }
-    var feedbackText by remember { mutableStateOf("") }
     var showDialog by remember { mutableStateOf(false) }
-
     val scope = rememberCoroutineScope()
 
     fun resetGame() {
         pattern = generatePattern()
         placed = List(pattern.size) { null }
         selectedColor = null
-        feedbackText = ""
         correctCount = 0
         failCount = 0
         streakCount = 0
@@ -184,109 +117,92 @@ fun PatternGameScreen() {
     fun checkComplete() {
         if (placed.all { it != null }) {
             showDialog = true
-            val seconds = (elapsedTime / 1000).coerceAtLeast(1)
-            speak("¡Felicidades, completaste el patrón en $seconds segundos!", null)
+            speak("¡Felicidades, completaste el patrón!", true)
         }
     }
 
-    // ⭐ LAYOUT PRINCIPAL
-    Box(modifier = Modifier.fillMaxSize()) {
-
-        // 🧥 Playera como fondo
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.7f)
-                .align(Alignment.Center)
-        ) {
-            Image(
-                painter = painterResource(id = R.drawable.playera),
-                contentDescription = "Playera de fondo",
-                modifier = Modifier
-                    .fillMaxWidth(1.2f)
-                    .fillMaxHeight(0.95f)
-                    .align(Alignment.Center),
-                contentScale = ContentScale.FillHeight
+    Box(
+        modifier = Modifier.fillMaxSize().background(
+            if (orientation == Configuration.ORIENTATION_PORTRAIT) {
+                Brush.verticalGradient(
+                    colors = listOf(Color(0xFFFFEBEE), Color.White)
+                )
+            } else {
+                Brush.horizontalGradient(
+                    colors = listOf(Color(0xFFFFEBEE), Color(0xFFFFFDE7))
+                )
+            }
+        )
+    ) {
+        if (orientation == Configuration.ORIENTATION_PORTRAIT) {
+            PlayeraAndSlots(
+                pattern = pattern,
+                placed = placed,
+                selectedColor = selectedColor,
+                onSlotClick = { index: Int ->
+                    if (selectedColor == pattern[index]) {
+                        placed = placed.toMutableList().also { it[index] = selectedColor }
+                        playSuccess()
+                        checkComplete()
+                    } else {
+                        playFailure()
+                    }
+                },
+                slotSize = 120.dp,
+                slotSpacing = 14.dp
             )
+        } else if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            Row(modifier = Modifier.fillMaxSize()) {
+                PlayeraAndSlots(
+                    pattern = pattern,
+                    placed = placed,
+                    selectedColor = selectedColor,
+                    onSlotClick = { index: Int ->
+                        if (selectedColor == pattern[index]) {
+                            placed = placed.toMutableList().also { it[index] = selectedColor }
+                            playSuccess()
+                            checkComplete()
+                        } else {
+                            playFailure()
+                        }
+                    },
+                    slotSize = 90.dp,
+                    slotSpacing = 2.dp,
+                    modifier = Modifier.weight(1f)
+                )
 
-            // ⭐ Slots sobre la playera
-            Column(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(horizontal = 70.dp, vertical = 40.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                for (row in 0 until 3) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        for (col in 0 until 2) {
-                            val index = row * 2 + col
-                            val canClickSlot = selectedColor != null && placed[index] == null
-
-                            SlotWithPattern(
-                                patternColor = pattern[index],
-                                placedColor = placed[index],
-                                canClick = canClickSlot,
-                                onSlotClick = {
-                                    if (selectedColor == null) return@SlotWithPattern
-
-                                    if (selectedColor == pattern[index]) {
-                                        placed = placed.toMutableList().also { it[index] = selectedColor }
-                                        feedbackText = playSuccess()
-                                        checkComplete()
-                                    } else {
-                                        feedbackText = playFailure()
-                                        scope.launch {
-                                            delay(900)
-                                            feedbackText = ""
-                                        }
-                                    }
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .background(Color(0xFFFFFDE7)),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    for (row in 0 until 2) {
+                        Row(
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                        ) {
+                            for (col in 0 until 3) {
+                                val index = row * 3 + col
+                                if (index < GameColor.values().size) {
+                                    val gc = GameColor.values()[index]
+                                    ColorButton(
+                                        color = gc,
+                                        isSelected = (selectedColor == gc),
+                                        onClick = { selectedColor = gc }
+                                    )
                                 }
-                            )
+                            }
                         }
                     }
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(onClick = { resetGame() }) {
+                        Text("Reiniciar")
+                    }
                 }
             }
-        }
-
-        // ⭐ Panel inferior
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .background(Color.White.copy(alpha = 0.9f))
-                .padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(text = feedbackText, fontSize = 18.sp)
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // 🎨 Botones
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                GameColor.values().forEach { gc ->
-                    ColorButton(
-                        color = gc,
-                        isSelected = (selectedColor == gc),
-                        onClick = { selectedColor = gc }
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(onClick = { resetGame() }) { Text("Reiniciar") }
-
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = "Aciertos: $correctCount | Errores: $failCount | Racha: $streakCount",
-                fontSize = 14.sp
-            )
         }
     }
 
@@ -294,29 +210,73 @@ fun PatternGameScreen() {
         AlertDialog(
             onDismissRequest = {},
             title = { Text("¡Felicidades!") },
-            text = { Text("Completaste el patrón en ${(elapsedTime / 1000)} segundos.") },
+            text = { Text("Completaste el patrón.") },
             confirmButton = {
-                TextButton(onClick = {
-                    showDialog = false
-                    resetGame()
-                }) {
-                    Text("Volver a jugar")
-                }
+                TextButton(onClick = { showDialog = false; resetGame() }) { Text("Volver a jugar") }
             }
         )
     }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////
-// ⭐ SLOT SIN CARD — solo imagen transparente + animación de caída real
-/////////////////////////////////////////////////////////////////////////////////////
+@Composable
+fun PlayeraAndSlots(
+    pattern: List<GameColor>,
+    placed: List<GameColor?>,
+    selectedColor: GameColor?,
+    onSlotClick: (Int) -> Unit,
+    slotSize: Dp,
+    slotSpacing: Dp,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier.fillMaxHeight(),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            painter = painterResource(id = R.drawable.playera),
+            contentDescription = null,
+            modifier = Modifier
+                .fillMaxHeight(0.95f)
+                .fillMaxWidth(1.2f)
+                .align(Alignment.Center),
+            contentScale = ContentScale.FillHeight
+        )
+        Column(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .offset(x = 121.dp),
+            verticalArrangement = Arrangement.spacedBy(slotSpacing),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            for (row in 0 until 3) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    for (col in 0 until 2) {
+                        val index = row * 2 + col
+                        val canClickSlot = selectedColor != null && placed[index] == null
+                        SlotWithPattern(
+                            patternColor = pattern[index],
+                            placedColor = placed[index],
+                            canClick = canClickSlot,
+                            onSlotClick = { onSlotClick(index) },
+                            size = slotSize
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 fun SlotWithPattern(
     patternColor: GameColor,
     placedColor: GameColor?,
     canClick: Boolean,
-    onSlotClick: () -> Unit
+    onSlotClick: () -> Unit,
+    size: Dp
 ) {
     var pressed by remember { mutableStateOf(false) }
     var placedAnim by remember { mutableStateOf(false) }
@@ -328,7 +288,7 @@ fun SlotWithPattern(
 
     Box(
         modifier = Modifier
-            .size(120.dp)
+            .size(size)
             .scale(scale)
             .clickable(enabled = isClickable && canClick) {
                 isClickable = false
@@ -338,22 +298,20 @@ fun SlotWithPattern(
             },
         contentAlignment = Alignment.Center
     ) {
-        // 🎯 Patrón tenue (slot vacío)
         Image(
             painter = painterResource(id = patternColor.imageRes),
-            contentDescription = patternColor.label,
+            contentDescription = null,
             modifier = Modifier
-                .size(120.dp)
+                .size(size)
                 .alpha(0.35f),
             contentScale = ContentScale.Fit
         )
-        // 🟢 Botón colocado con animación de caída
         if (placedColor != null) {
             Image(
                 painter = painterResource(id = placedColor.imageRes),
-                contentDescription = placedColor.label,
+                contentDescription = null,
                 modifier = Modifier
-                    .size(120.dp)
+                    .size(size)
                     .scale(fallScale)
                     .alpha(alpha),
                 contentScale = ContentScale.Fit
@@ -373,36 +331,24 @@ fun SlotWithPattern(
     }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////
-// ⭐ BOTONES INFERIORES
-/////////////////////////////////////////////////////////////////////////////////////
-
 @Composable
 fun ColorButton(color: GameColor, isSelected: Boolean, onClick: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-
-        Card(
-            modifier = Modifier
-                .size(60.dp)
-                .clickable { onClick() },
-            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = if (isSelected)
-                    Color.LightGray.copy(alpha = 0.5f)
-                else Color.White
+    Card(
+        modifier = Modifier
+            .size(80.dp)
+            .clickable { onClick() },
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) Color.LightGray.copy(alpha = 0.5f) else Color.White
+        )
+    ) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+            Image(
+                painter = painterResource(id = color.imageRes),
+                contentDescription = null,
+                modifier = Modifier.size(65.dp),
+                contentScale = ContentScale.Fit
             )
-        ) {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                Image(
-                    painter = painterResource(id = color.imageRes),
-                    contentDescription = color.label,
-                    modifier = Modifier.size(35.dp),
-                    contentScale = ContentScale.Fit
-                )
-            }
         }
-
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(text = color.label, fontSize = 11.sp)
     }
 }
